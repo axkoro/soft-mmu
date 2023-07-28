@@ -96,7 +96,7 @@ void set_data(uint32_t virt_address, uint8_t value) {
 
 
 int main(void) {
-		puts("test driver_");
+	puts("test driver_");
 	static uint8_t hd_mem_expected[4194304];
 	srand(1);
 	fflush(stdout);
