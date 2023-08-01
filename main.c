@@ -15,88 +15,151 @@ struct seitentabellen_zeile {
 	int8_t page_frame;
 }seitentabelle[1024]; // 4194304 >> 12 = 1024
 
-uint16_t get_seiten_nr(uint32_t virt_address) {
-	/**
-	 *
-	 */
+
+const uint16_t page_size = 4096;
+uint8_t num_pages_loaded = 0;
+
+
+uint16_t get_page_num(uint32_t virt_address) {
+	/*
+	* Extrahiert den 10-Bit-Teil der virtuellen Adresse, der die Seitennummer kodiert.
+	*/
+
 	return virt_address >> 12;
 }
 
-uint16_t virt_2_ram_address(uint32_t virt_address) {
+uint16_t ram_from_virt_address(uint32_t virt_address) {
 	/**
 	 * Wandelt eine virtuelle Adresse in eine physikalische Adresse um.
-	 * Der Rückgabewert ist die physikalische 16 Bit Adresse.
 	 */
 
-	//TODO
+	uint16_t page_num = get_page_num(virt_address);
+	uint8_t frame = seitentabelle[page_num].page_frame;
+	
+	if (frame < 0) { exit(-1); }
+
+	uint16_t offset = virt_address & 4095; // 4095 = 0b0000111111111111
+
+	return ((uint16_t) frame << 12) | offset;
 }
 
 int8_t check_present(uint32_t virt_address) {
 	/**
-	 * Wenn eine Seite im Arbeitsspeicher ist, gibt die Funktion "check_present" 1 zurück, sonst 0
+	 * Wenn eine Seite im Arbeitsspeicher ist, gibt die Funktion "check_present" 1 zurück, sonst 0.
 	 */
-	return seitentabelle[get_seiten_nr(virt_address)].present_bit;
+
+	return seitentabelle[get_page_num(virt_address)].present_bit;
 }
 
 int8_t is_mem_full() {
 	/**
-	 * Wenn der Speicher voll ist, gibt die Funktion 1 zurück;
+	 * Wenn der Speicher voll ist, gibt die Funktion 1 zurück.
 	 */
-	//TODO
+
+	return (num_pages_loaded == 16);
 }
 
-int8_t write_page_to_hd(uint32_t seitennummer, uint32_t virt_address) { // alte addresse! nicht die neue!
+void write_page_to_hd(uint16_t page_num) {
 	/**
-	 * Schreibt eine Seite zurück auf die HD
+	 * Schreibt eine Seite zurück auf die HD.
 	 */
 
-	//TODO
+	uint8_t frame = seitentabelle[page_num].page_frame; 
+
+	for (int i = 0; i < page_size; i++) {
+		hd_mem[page_num * page_size + i] = ra_mem[frame * page_size + i];
+	}
 }
 
-uint16_t swap_page(uint32_t virt_address) {
+void swap_page(uint16_t page_num) {
 	/**
-	 * Das ist die Funktion zur Auslagerung einer Seite.
-	 * Wenn das "Dirty_Bit" der Seite in der Seitentabelle gesetzt ist,
-	 * muss die Seite zurück in den hd_mem geschrieben werden.
-	 * Welche Rückschreibstrategie Sie implementieren möchten, ist Ihnen überlassen.
+	 * Lagert eine Seite im Hauptspeicher in den Sekundärspeicher aus.
 	 */
-	//TODO
+
+	if (seitentabelle[page_num].dirty_bit) {
+		write_page_to_hd(page_num);
+		seitentabelle[page_num].dirty_bit = 0;
+	}
+
+	seitentabelle[page_num].present_bit = 0;
 }
 
-int8_t get_page_from_hd(uint32_t virt_address) {
+void get_page_from_hd(uint32_t virt_address) {
 	/**
 	 * Lädt eine Seite von der Festplatte und speichert diese Daten im ra_mem (Arbeitsspeicher).
 	 * Erstellt einen Seitentabelleneintrag.
-	 * Wenn der Arbeitsspeicher voll ist, muss eine Seite ausgetauscht werden.
+	 * Wenn der Arbeitsspeicher voll ist, wird eine zufällige Seite ausgetauscht.
 	 */
 
-	//TODO
+	uint16_t page_num = get_page_num(virt_address);
+	uint8_t frame;
+	
+	if(is_mem_full()) {
+		srand(time(NULL)); // Tauschstrategie: Random
+		frame = rand() % 16;
 
+		for (int i = 0; i < 1024; i++) { // Suche in Seitentabelle nach Page, die den Frame belegt und lagere sie aus
+			if (seitentabelle[i].present_bit && (seitentabelle[i].page_frame == frame)) {
+				swap_page(i);
+				break;
+			}
+		}
+	} else {
+		num_pages_loaded++;
+
+		uint8_t used_frames[16]; // Freien Page-Frame finden
+		for (int i = 0; i < 16; i++) {
+			used_frames[i] = 0;
+		}
+		
+		for (int i = 0; i < 1024; i++) {
+			used_frames[seitentabelle[i].page_frame] = seitentabelle[i].present_bit;
+		}
+		
+		for (int i = 0; i < 16; i++) {
+			if (!used_frames[i]) {
+				frame = i;
+				break;
+			}
+		}
+	}
+
+	seitentabelle[page_num].page_frame = frame; // Tabelleneintrag aktualisieren
+	seitentabelle[page_num].present_bit = 1;
+	seitentabelle[page_num].dirty_bit = 0;
+
+	for (int i = 0; i < page_size; i++) { // Page-Inhalt in Frame laden
+		ra_mem[frame*page_size + i] = hd_mem[page_num*page_size + i];
+	}
 }
 
 uint8_t get_data(uint32_t virt_address) {
 	/**
 	 * Gibt ein Byte aus dem Arbeitsspeicher zurück.
-	 * Wenn die Seite nicht in dem Arbeitsspeicher vorhanden ist,
-	 * muss erst "get_page_from_hd(virt_address)" aufgerufen werden. Ein direkter Zugriff auf hd_mem[virt_address] ist VERBOTEN!
-	 * Die definition dieser Funktion darf nicht geaendert werden. Namen, Parameter und Rückgabewert muss beibehalten werden!
+	 * Wenn die Seite nicht in dem Arbeitsspeicher vorhanden ist, wird sie zunächst geladen.
 	 */
-	//TODO
+
+	if (!check_present(virt_address)) {
+		get_page_from_hd(virt_address);
+	}
+	return ra_mem[ram_from_virt_address(virt_address)];
 }
 
 void set_data(uint32_t virt_address, uint8_t value) {
 	/**
-	 * Schreibt ein Byte in den Arbeitsspeicher zurück.
-	 * Wenn die Seite nicht in dem Arbeitsspeicher vorhanden ist,
-	 * muss erst "get_page_from_hd(virt_address)" aufgerufen werden. Ein direkter Zugriff auf hd_mem[virt_address] ist VERBOTEN!
+	 * Schreibt ein Byte in den Arbeitsspeicher.
+	 * Wenn die Seite nicht in dem Arbeitsspeicher vorhanden ist, wird sie zunächst geladen.
 	 */
 
-	//TODO
+	if (!check_present(virt_address)) {
+		get_page_from_hd(virt_address);
+	}
+	ra_mem[ram_from_virt_address(virt_address)] = value;
 }
 
 
 int main(void) {
-	puts("test driver_");
+		puts("test driver_");
 	static uint8_t hd_mem_expected[4194304];
 	srand(1);
 	fflush(stdout);
@@ -161,7 +224,7 @@ int main(void) {
 		uint8_t value = (uint8_t)zufallsadresse >> 1;
 		set_data(zufallsadresse, value);
 		hd_mem_expected[zufallsadresse] = value;
-//		printf("i : %d set_data address: %d - %d value at ram: %d\n",i,zufallsadresse,(uint8_t)value, ra_mem[virt_2_ram_address(zufallsadresse)]);
+//		printf("i : %d set_data address: %d - %d value at ram: %d\n",i,zufallsadresse,(uint8_t)value, ra_mem[ram_from_virt_address(zufallsadresse)]);
 	}
 
 
