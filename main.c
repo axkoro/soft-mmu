@@ -105,23 +105,8 @@ void get_page_from_hd(uint32_t virt_address) {
 			}
 		}
 	} else {
+		frame = num_pages_loaded;
 		num_pages_loaded++;
-
-		uint8_t used_frames[16]; // Freien Page-Frame finden
-		for (int i = 0; i < 16; i++) {
-			used_frames[i] = 0;
-		}
-		
-		for (int i = 0; i < 1024; i++) {
-			used_frames[seitentabelle[i].page_frame] = seitentabelle[i].present_bit;
-		}
-		
-		for (int i = 0; i < 16; i++) {
-			if (!used_frames[i]) {
-				frame = i;
-				break;
-			}
-		}
 	}
 
 	seitentabelle[page_num].page_frame = frame; // Tabelleneintrag aktualisieren
