@@ -95,8 +95,7 @@ void get_page_from_hd(uint32_t virt_address) {
 	uint8_t frame;
 	
 	if(is_mem_full()) {
-		srand(26); // Tauschstrategie: Random
-		frame = rand() % 16;
+		frame = rand() % 16; // Tauschstrategie: Random
 
 		for (int i = 0; i < 1024; i++) { // Suche in Seitentabelle nach Page, die den Frame belegt und lagere sie aus
 			if (seitentabelle[i].present_bit && (seitentabelle[i].page_frame == frame)) {
@@ -140,6 +139,7 @@ void set_data(uint32_t virt_address, uint8_t value) {
 		get_page_from_hd(virt_address);
 	}
 	ra_mem[ram_from_virt_address(virt_address)] = value;
+	seitentabelle[get_page_num(virt_address)].dirty_bit = 1;
 }
 
 
@@ -209,7 +209,7 @@ int main(void) {
 		uint8_t value = (uint8_t)zufallsadresse >> 1;
 		set_data(zufallsadresse, value);
 		hd_mem_expected[zufallsadresse] = value;
-//		printf("i : %d set_data address: %d - %d value at ram: %d\n",i,zufallsadresse,(uint8_t)value, ra_mem[ram_from_virt_address(zufallsadresse)]);
+//		printf("i : %d set_data address: %d - %d value at ram: %d\n",i,zufallsadresse,(uint8_t)value, ra_mem[virt_2_ram_address(zufallsadresse)]);
 	}
 
 
