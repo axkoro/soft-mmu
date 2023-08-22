@@ -95,7 +95,7 @@ void get_page_from_hd(uint32_t virt_address) {
 	uint8_t frame;
 	
 	if(is_mem_full()) {
-		srand(time(NULL)); // Tauschstrategie: Random
+		srand(26); // Tauschstrategie: Random
 		frame = rand() % 16;
 
 		for (int i = 0; i < 1024; i++) { // Suche in Seitentabelle nach Page, die den Frame belegt und lagere sie aus
