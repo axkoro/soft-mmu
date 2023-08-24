@@ -1,4 +1,1 @@
-.vscode/
-soft_mmu.code-workspace
-main
-main.dSYM/Contents/Info.plist
+.gitignore
