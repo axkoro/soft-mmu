@@ -36,7 +36,7 @@ uint16_t ram_from_virt_address(uint32_t virt_address) {
 	uint16_t page_num = get_page_num(virt_address);
 	uint8_t frame = seitentabelle[page_num].page_frame;
 	
-	if (frame < 0) { exit(-1); }
+	if (frame < 0) { exit(-1); } // hätte einfach auf Present-Bit checken sollen
 
 	uint16_t offset = virt_address & 4095; // 4095 = 0b0000111111111111
 
